@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta
 from jose import JWTError, jwt 
 from passlib.context  import  CryptContext
+from fastapi import Depends, HTTPException
+from fastapi.security import OAuth2PasswordBearer
 
 SECRET_KEY = "clave-secreta-muy-segura-cambiar-en-produccion"
 ALGORITHM = "HS256"
@@ -26,3 +28,12 @@ def verificar_token(token: str):
         return payload
     except JWTError:
         return None
+
+
+oauth2_scheme = OAuth2PasswordBearer (tokenUrl="login")
+
+def get_current_user (token: str = Depends(oauth2_scheme)):
+    payload = verificar_token(token)
+    if payload is None:
+        raise  HTTPException(status_code=401, detail="Token inválido o expirado")
+    return payload

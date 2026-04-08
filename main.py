@@ -3,7 +3,8 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 import models
 from database import engine, SessionLocal
-from auth import hashear_password, verificar_password, crear_token
+from auth import hashear_password, verificar_password, crear_token, get_current_user
+from fastapi.security import OAuth2PasswordRequestForm
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -39,7 +40,7 @@ class TareaCreate(BaseModel):
     
 
 @app.post("/tareas")
-def crear_tarea(tarea: TareaCreate, db: Session = Depends(get_db)):
+def crear_tarea(tarea: TareaCreate, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
     nueva_tarea = models.Tarea(
         titulo=tarea.titulo,
         descripcion=tarea.descripcion,
@@ -51,7 +52,7 @@ def crear_tarea(tarea: TareaCreate, db: Session = Depends(get_db)):
     return nueva_tarea
 
 @app.delete("/tareas/{tarea_id}")
-def eliminar_tarea(tarea_id: int, db: Session = Depends(get_db)):
+def eliminar_tarea(tarea_id: int, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
     tarea = db.query(models.Tarea).filter(models.Tarea.id == tarea_id).first()
     if tarea is None:
         raise HTTPException(status_code=404, detail="Tarea no encontrada")
@@ -60,7 +61,7 @@ def eliminar_tarea(tarea_id: int, db: Session = Depends(get_db)):
     return {"mensaje": "tarea borrada"}
 
 @app.put("/tareas/{tarea_id}/completar")
-def tarea_completada(tarea_id: int, db: Session = Depends(get_db)):
+def tarea_completada(tarea_id: int, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
     tarea = db.query(models.Tarea).filter(models.Tarea.id == tarea_id).first()
     if tarea is None:
         raise HTTPException(status_code=404, detail="Tarea no encontrada")
@@ -74,7 +75,7 @@ class TareaUpdate(BaseModel):
     prioridad: str   
 
 @app.put("/tareas/{tarea_id}")
-def actualizar_tarea(tarea_id: int, datos: TareaUpdate, db: Session = Depends(get_db)):
+def actualizar_tarea(tarea_id: int, datos: TareaUpdate, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
     tarea = db.query(models.Tarea).filter(models.Tarea.id == tarea_id).first()
     if tarea is None:
         raise HTTPException(status_code=404, detail="Tarea no encontrada")
@@ -103,11 +104,11 @@ def register(usuario: UsuarioCreate, db: Session = Depends(get_db)):
     return {"mensaje": "Usuario creado con éxito"}
 
 @app.post("/login")
-def login(usuario: UsuarioCreate, db: Session = Depends(get_db)):
-    db_usuario = db.query(models.Usuario).filter(models.Usuario.email == usuario.email).first()
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    db_usuario = db.query(models.Usuario).filter(models.Usuario.email == form_data.username).first()
     if not db_usuario:
         raise HTTPException(status_code=401, detail="Email o contraseña incorrectos")
-    if not verificar_password(usuario.password, db_usuario.password):
+    if not verificar_password(form_data.password, db_usuario.password):
         raise HTTPException(status_code=401, detail="Email o contraseña incorrectos")
     token = crear_token({"sub": db_usuario.email})
     return {"access_token": token, "token_type": "bearer"}
