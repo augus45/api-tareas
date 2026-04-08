@@ -10,3 +10,10 @@ class Tarea(Base):
     completada = Column(Boolean, default=False)
     prioridad = Column(String, default="media")
 
+class Usuario(Base):
+    __tablename__ = "usuarios"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, unique=True, index=True)
+    password = Column(String)
+

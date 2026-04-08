@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 import models
 from database import engine, SessionLocal
+from auth import hashear_password, verificar_password, crear_token
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -35,6 +36,7 @@ class TareaCreate(BaseModel):
     titulo: str
     descripcion: str
     prioridad: str = "media"
+    
 
 @app.post("/tareas")
 def crear_tarea(tarea: TareaCreate, db: Session = Depends(get_db)):
@@ -81,4 +83,32 @@ def actualizar_tarea(tarea_id: int, datos: TareaUpdate, db: Session = Depends(ge
     tarea.prioridad = datos.prioridad
     db.commit()
     return {"mensaje": "tarea actualizada"}
+
+
+class UsuarioCreate(BaseModel):
+    email: str
+    password: str
+
+@app.post("/register")
+def register(usuario: UsuarioCreate, db: Session = Depends(get_db)):
+    db_usuario = db.query(models.Usuario).filter(models.Usuario.email == usuario.email).first()
+    if db_usuario:
+        raise HTTPException(status_code=400, detail="El email ya está registrado")
+    nuevo_usuario = models.Usuario(
+        email=usuario.email,
+        password=hashear_password(usuario.password)
+    )
+    db.add(nuevo_usuario)
+    db.commit()
+    return {"mensaje": "Usuario creado con éxito"}
+
+@app.post("/login")
+def login(usuario: UsuarioCreate, db: Session = Depends(get_db)):
+    db_usuario = db.query(models.Usuario).filter(models.Usuario.email == usuario.email).first()
+    if not db_usuario:
+        raise HTTPException(status_code=401, detail="Email o contraseña incorrectos")
+    if not verificar_password(usuario.password, db_usuario.password):
+        raise HTTPException(status_code=401, detail="Email o contraseña incorrectos")
+    token = crear_token({"sub": db_usuario.email})
+    return {"access_token": token, "token_type": "bearer"}
     
