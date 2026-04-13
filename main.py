@@ -123,3 +123,4 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     token = crear_token({"sub": db_usuario.email})
     return {"access_token": token, "token_type": "bearer"}
     
+    #API de tareas -v2
